@@ -1,10 +1,18 @@
 #!/bin/sh
 
-log_name="filer"
-log_prio="user.notice"
+LOG_NAME="filer"
+LOG_PRIO="user.notice"
+REPLICATION_INTERFACE="bge1"
+MAIN_INTERFACE="bge0"
+VIRTUAL_IP="192.168.10.15"
+CARP_PASSWORD="249bcd2afe7d951d9bbede600rdd4804"
+VHID="54"
+MOUNTD_FLAGS="-r -S -h ${VIRTUAL_IP}"
+NFS_SERVER_FLAGS="-t -h ${VIRTUAL_IP}"
+NFSUSERD_FLAGS="-domain prod.lan"
 
 flog () {
-  logger -p "$log_prio" -t "$log_name" "$1"
+  logger -p "${LOG_PRIO}" -t "${LOG_NAME}" "$1"
 }
 
 boottime=$(sysctl -n kern.boottime | awk '{print $4}' | tr -dc 0-9)
@@ -52,13 +60,13 @@ case "$1" in
     # etc)
     # 5) Start the NFS services (and adapt rc.conf)
     flog "Shutting down the replication interface"
-    ifconfig bge1 down
-    sysrc ifconfig_bge1="down"
+    ifconfig "${REPLICATION_INTERFACE}" down
+    sysrc ifconfig_"${REPLICATION_INTERFACE}"="down"
 
     # Backup is the new master
     flog "Adapting advskew on the main interface"
-    sysrc ifconfig_bge0_alias0="inet vhid 54 advskew 10 pass 249bcd2afe7d951d9bbede600rdd4804 alias 192.168.10.15/32" 
-    ifconfig bge0 vhid 54 advskew 10
+    sysrc ifconfig_"${MAIN_INTERFACE}"_alias0="inet vhid ${VHID} advskew 10 pass ${CARP_PASSWORD} alias ${VIRTUAL_IP}/32" 
+    ifconfig "${MAIN_INTERFACE}" vhid "${VHID}" advskew 10
 
     flog "Shutting down the CTLD daemon"
     sysrc ctld_enable="NO"
@@ -77,11 +85,11 @@ case "$1" in
     fi
 
     sysrc mountd_enable="YES"
-    sysrc mountd_flags="-r -S -h 192.168.10.15"
+    sysrc mountd_flags="${MOUNTD_FLAGS}"
     sysrc nfs_server_enable="YES"
-    sysrc nfs_server_flags="-t -h 192.168.10.15"
+    sysrc nfs_server_flags="${NFS_SERVER_FLAGS}"
     sysrc nfsuserd_enable="YES"
-    sysrc nfsuserd_flags="-domain prod.lan"
+    sysrc nfsuserd_flags="${NFSUSERD_FLAGS}"
     sysrc nfsv4_server_enable="YES"
 
     flog "Start NFS services (nfsuserd, nfsd)"
